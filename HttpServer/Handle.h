@@ -76,7 +76,7 @@ public slots:
 		qDebug() << "[HS:H]:" << __func__ << ": ClientId:" << (qint64)QThread::currentThread() << "Connected.";
 		return true;
 	}
-	void msgSend(const QByteArray &dat){
+	void msgSend(const QByteArray &dat, bool isLast = false){
 		if(dat.isNull() || dat.isEmpty()){
 			qDebug() << "[HS:H]:" << __func__ << ": Will send an empty or null message document. Abandoned.";
 			return;
@@ -93,12 +93,12 @@ public slots:
 		this->socket->write(dat);
 	}
 	void msgSendBadRequest(){
-		QByteArray dat = Protocol::makeupA400Response();
+		QByteArray dat = Response::makeup400Response();
 		this->msgSend(dat);
 		this->close();
 	}
 	void msgSendInternalError(){
-		QByteArray dat = Protocol::makeupA500Response();
+		QByteArray dat = Response::makeup500Response();
 		this->msgSend(dat);
 		this->close();
 	}

@@ -203,7 +203,8 @@ private slots:
 			 */
 
 
-			client.handle->msgSend(Protocol::makeupResponse(response));
+			//client.handle->msgSend(Protocol::makeupResponse(response));
+			client.handle->msgSend(response.toByteArray());
 			client.handle->close();
 			this->clientReqMap.remove(tid);
 		}
