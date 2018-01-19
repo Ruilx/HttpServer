@@ -89,7 +89,9 @@ public slots:
 			qDebug() << "[HS:H]:" << __func__ << ": This session is already replied.";
 			return;
 		}
-		this->alreadyReplied = true;
+		if(isLast == true){
+			this->alreadyReplied = true;
+		}
 		this->socket->write(dat);
 	}
 	void msgSendBadRequest(){
