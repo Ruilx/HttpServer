@@ -43,7 +43,7 @@ private:
 	QHash<QString, QString> cookie; // cookie: name=value
 	QByteArray content;
 
-	bool vaild = false;
+	bool valid = false;
 
 	void analysisCookie(const QString &cookieStr){
 		QStringList cookieKVList = cookieStr.split("; ", QString::SkipEmptyParts);
@@ -75,7 +75,15 @@ public:
 			this->method = Method_Unknown;
 		}
 	}
-	const Method getMethod(){ return this->method; }
+	inline Method getMethod() const{ return this->method; }
+	const QString getMethodString() const{
+		switch(this->method){
+			case Method_Get: return QString("GET");
+			case Method_Post: return QString("POST");
+			case Method_Head: return QString("HEAD");
+			default: return QString("UNKNOWN");
+		}
+	}
 
 	bool setUrl(const QString &url){
 		QUrl _url = QUrl::fromPercentEncoding(url.toUtf8());
@@ -108,6 +116,14 @@ public:
 		return this->url;
 	}
 
+	const QString getUrlLocalRelativePath() const{
+		if(this->url.startsWith("/")){
+			return QString(this->url).prepend(".");
+		}else{
+			return this->url;
+		}
+	}
+
 	const QString getFullUrl() const{
 		return this->fullUrl;
 	}
@@ -125,7 +141,7 @@ public:
 				return false;
 			}else{
 				this->version.majorVersion = versionList.at(0).toInt();
-				this->version.minorVersion - versionList.at(1).toInt();
+				this->version.minorVersion = versionList.at(1).toInt();
 				return true;
 			}
 		}
@@ -164,12 +180,16 @@ public:
 		}
 	}
 
-	void getHeader(const QString &key, const QString &defaultValue = QString()){
+	const QString getHeader(const QString &key, const QString &defaultValue = QString()){
 		return this->header.value(key, defaultValue);
 	}
 
-	void getHeaderLength(){
+	int getHeaderLength(){
 		return this->header.count();
+	}
+
+	QStringList getHeaderKeys() const{
+		return this->header.keys();
 	}
 
 	void setContent(const QByteArray &content){
@@ -209,7 +229,7 @@ public:
 	}
 
 	void setFinished(bool valid){
-		this->vaild = vaild;
+		this->valid = valid;
 	}
 
 	bool isValid(){

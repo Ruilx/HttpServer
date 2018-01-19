@@ -73,7 +73,7 @@ public:
 		No_Store = 4,
 		No_Transform = 8,
 		Public = 16,
-		Private = 31,
+		Private = 32,
 		Proxy_Revalidate = 64,
 		Max_Age = 128,
 		S_Maxage = 256,
@@ -260,7 +260,7 @@ private:
 			case 4: return QString("no-store");
 			case 8: return QString("no-transform");
 			case 16: return QString("public");
-			case 31: return QString("private");
+			case 32: return QString("private");
 			case 64: return QString("proxy-revalidate");
 			case 128: return QString("max-age=");
 			case 256: return QString("s-maxage=");
@@ -315,7 +315,7 @@ public:
 	inline void setCtrl(const QString &ctrl){ this->ctrl = ctrl; }
 	inline void setVersion(const Version &version){ this->version = version; }
 	const QString getCtrlAndVersionString() const{
-		return QString(this->ctrl.append("/%1.%2")).arg(this->version.majorVersion).arg(this->version.minorVersion);
+		return QString(this->ctrl).append("/%1.%2").arg(this->version.majorVersion).arg(this->version.minorVersion);
 	}
 
 	inline void setStatusCode(int statusCode){
@@ -416,33 +416,33 @@ public:
 
 	void setCacheControl(CacheControls cacheControls, const QHash<CacheControl, int> &secondsHash = QHash<CacheControl, int>()){
 		QStringList cacheControlsStr;
-		if(cacheControls | Must_Revalidate){
+		if(cacheControls & Must_Revalidate){
 			cacheControlsStr.append(this->getCacheControlString(Must_Revalidate));
 		}
-		if(cacheControls | No_Cache){
+		if(cacheControls & No_Cache){
 			cacheControlsStr.append(this->getCacheControlString(No_Cache));
 		}
-		if(cacheControls | No_Store){
+		if(cacheControls & No_Store){
 			cacheControlsStr.append(this->getCacheControlString(No_Store));
 		}
-		if(cacheControls | No_Transform){
+		if(cacheControls & No_Transform){
 			cacheControlsStr.append(this->getCacheControlString(No_Transform));
 		}
-		if(cacheControls | Public){
+		if(cacheControls & Public){
 			cacheControlsStr.append(this->getCacheControlString(Public));
 		}
-		if(cacheControls | Private){
+		if(cacheControls & Private){
 			cacheControlsStr.append(this->getCacheControlString(Private));
 		}
-		if(cacheControls | Proxy_Revalidate){
+		if(cacheControls & Proxy_Revalidate){
 			cacheControlsStr.append(this->getCacheControlString(Proxy_Revalidate));
 		}
-		if(cacheControls | Max_Age){
+		if(cacheControls & Max_Age){
 			if(secondsHash.contains(Max_Age)){
 				cacheControlsStr.append(QString(this->getCacheControlString(Max_Age)).append(QString::number(secondsHash.value(Max_Age))));
 			}
 		}
-		if(cacheControls | S_Maxage){
+		if(cacheControls & S_Maxage){
 			if(secondsHash.contains(S_Maxage)){
 				cacheControlsStr.append(QString(this->getCacheControlString(S_Maxage)).append(QString::number(secondsHash.value(S_Maxage))));
 			}
@@ -491,13 +491,13 @@ public:
 
 	const QByteArray toByteArray(MakeupFlag flag = Strict){
 		QByteArray responseFrame = this->headerToByteArray(flag);
-		if(MakeupFlag != Strict){
+		if(flag != Strict){
 			return responseFrame;
 		}
 		if(!this->content.isEmpty()){
-			return responseFrame.toUtf8().append(this->content).append("\r\n");
+			return responseFrame.append(this->content).append("\r\n");
 		}else{
-			return responseFrame.toUtf8();
+			return responseFrame;
 		}
 	}
 
