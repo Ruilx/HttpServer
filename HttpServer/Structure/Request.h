@@ -18,18 +18,49 @@ public:
 		short minorVersion = 0;
 	}Version;
 
+	static QString regenerateKey(const QString &str){
+		QStringList keySep = str.split("-", QString::KeepEmptyParts);
+		QStringList newKeySep;
+		foreach(QString key, keySep){
+			if(key.isEmpty()){
+				continue;
+			}
+			QChar firstLetter = key.at(0).toUpper();
+			QString restLetters = key.mid(1).toLower();
+			newKeySep.append(QString(firstLetter).append(restLetters));
+		}
+		return newKeySep.join("-");
+	}
 private:
 	Method method = Method_Unknown;
 	QString url;
+	QString fullUrl;
 	QString ctrl;
 	Version version;
 
 	QHash<QString, QString> query; // ?a=b&c=d
 	QHash<QString, QString> header; // Accept: xxx
+	QHash<QString, QString> cookie; // cookie: name=value
 	QByteArray content;
 
 	bool vaild = false;
+
+	void analysisCookie(const QString &cookieStr){
+		QStringList cookieKVList = cookieStr.split("; ", QString::SkipEmptyParts);
+		foreach(const QString &cookiePart, cookieKVList){
+			int cookieEqualIndex = cookiePart.indexOf("=");
+			if(cookieEqualIndex < 0){
+				this->cookie.insert(cookiePart.trimmed(), QString());
+			}else{
+				this->cookie.insert(cookiePart.left(cookieEqualIndex).trimmed(), cookiePart.mid(cookieEqualIndex +1).trimmed());
+			}
+		}
+	}
+
 public:
+	bool _headerComplete = false;
+	QString _halfLine;
+
 	Request(){ }
 
 	void setMethod(Method method){ this->method = method; }
@@ -52,6 +83,7 @@ public:
 			return false;
 		}
 		this->url = _url.path();
+		this->fullUrl = url;
 		if(_url.query().isEmpty()){
 			return true;
 		}
@@ -70,6 +102,14 @@ public:
 			}
 		}
 		return true;
+	}
+
+	const QString getUrl() const{
+		return this->url;
+	}
+
+	const QString getFullUrl() const{
+		return this->fullUrl;
 	}
 
 	bool setCtrl(const QString &ctrl){
@@ -96,16 +136,36 @@ public:
 		this->version = version;
 	}
 
+	const QString getCtrl() const{
+		return this->ctrl;
+	}
+
+	const QString getCtrlAndVersion() const{
+		if(this->version.minorVersion){
+			return QString("%1/%2.%3").arg(this->ctrl).arg(this->version.majorVersion).arg(this->version.minorVersion);
+		}else{
+			return QString("%1/%2").arg(this->ctrl).arg(this->version.majorVersion);
+		}
+
+	}
+
 	void insertHeader(const QString &key, const QString &value){
-		this->header.insert(key, value);
+		this->header.insert(this->regenerateKey(key), value);
+		if(key == "Cookie"){
+			this->analysisCookie(value);
+		}
+
 	}
 
 	void removeHeader(const QString &key){
 		this->header.remove(key);
+		if(key == "Cookie"){
+			this->cookie.clear();
+		}
 	}
 
-	void getHeader(const QString &key){
-		return this->header.value(key);
+	void getHeader(const QString &key, const QString &defaultValue = QString()){
+		return this->header.value(key, defaultValue);
 	}
 
 	void getHeaderLength(){
@@ -116,8 +176,16 @@ public:
 		this->content = content;
 	}
 
+	void appendContent(const QByteArray &content){
+		this->content.append(content);
+	}
+
 	const QByteArray &getContent(){
 		return this->content;
+	}
+
+	int getContentLength(){
+		return this->content.length();
 	}
 
 	const QHash<QString, QString> getContentQuery(){
@@ -140,7 +208,7 @@ public:
 		return contentQuery;
 	}
 
-	void setVaild(bool valid){
+	void setFinished(bool valid){
 		this->vaild = vaild;
 	}
 
@@ -150,6 +218,10 @@ public:
 				!this->ctrl.isEmpty() &&
 				this->version.majorVersion != 0 &&
 				this->valid);
+	}
+
+	QString getCookie(const QString &key){
+		return this->cookie.value(key);
 	}
 };
 

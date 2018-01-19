@@ -14,6 +14,11 @@ public:
 		short minorVersion = 1;
 	}Version;
 
+	enum MakeupFlag{
+		Strict = 0,
+		NoMoreMakeups = 1
+	};
+
 	enum TransferEncoding{
 		Normal = 0,
 		Chunked = 1,
@@ -96,6 +101,89 @@ public:
 		return r.getHeader();
 	}
 
+	static const QString getStatusCodeReason(int statusCode){
+		switch(statusCode){
+			case 100: return QString("Continue");
+			case 101: return QString("Switching Protocols");
+			case 102: return QString("Processing");
+			case 200: return QString("OK");
+			case 201: return QString("Created");
+			case 202: return QString("Accepted");
+			case 203: return QString("Partial Information");
+			case 204: return QString("No Response");
+			case 205: return QString("Resetted");
+			case 206: return QString("Parted");
+			case 207: return QString("Multi Status");
+			case 300: return QString("Multiple Choices");
+			case 301: return QString("Moved Permanently");
+			case 302: return QString("Moved Temporarily");
+			case 303: return QString("See Other");
+			case 304: return QString("Not Modified");
+			case 305: return QString("Use Proxy");
+			case 306: return QString("Switch Proxy");
+			case 307: return QString("Temporary Redirect");
+			case 400: return QString("Bad Request");
+			case 401: return QString("Unauthorized");
+			case 402: return QString("Payment Required");
+			case 403: return QString("Forbidden");
+			case 404: return QString("Not Found");
+			case 405: return QString("Method Not Allowed");
+			case 406: return QString("Not Acceptable");
+			case 407: return QString("Proxy Authentication Required");
+			case 408: return QString("Request Timeout");
+			case 409: return QString("Conflict");
+			case 410: return QString("Gone");
+			case 411: return QString("Length Required");
+			case 412: return QString("Precondition Failed");
+			case 413: return QString("Request Entity Too Large");
+			case 414: return QString("Request-URI Too Long");
+			case 415: return QString("Unsupported Media Type");
+			case 416: return QString("Requested Range Not Satisfiable");
+			case 417: return QString("Expectation Failed");
+			case 421: return QString("Too Many Connections");
+			case 422: return QString("Unprocessable Entity");
+			case 423: return QString("Locked");
+			case 424: return QString("Failed Dependency");
+			case 425: return QString("Unordered Collection");
+			case 426: return QString("Upgrade Required");
+			case 449: return QString("Retry With");
+			case 451: return QString("Unavailable For Legal Reasons");
+			case 500: return QString("Internal Error");
+			case 501: return QString("Not Implemented");
+			case 502: return QString("Bad Gateway");
+			case 503: return QString("Service Unavailable");
+			case 504: return QString("Gateway Timeout");
+			case 505: return QString("HTTP Version Not Supported");
+			case 506: return QString("Variant Also Negotiates");
+			case 507: return QString("Insufficient Storage");
+			case 509: return QString("Bandwidth Limit Exceeded");
+			case 510: return QString("Not Extended");
+			case 600: return QString("Unparseable Response Headers");
+			default:  return QString("Unknown");
+		}
+	}
+
+	static const QByteArray makeup404Response(const QByteArray &content = QByteArray("404 Not Found")){
+		Response response(404);
+		response.setContent(content);
+		response.setFinished(true);
+		return response.toByteArray(NoMoreMakeups);
+	}
+
+	static const QByteArray makeup400Response(const QByteArray &content = QByteArray("400 Bad Request")){
+		Response response(400);
+		response.setContent(content);
+		response.setFinished(true);
+		return response.toByteArray(NoMoreMakeups);
+	}
+
+	static const QByteArray makeup500Response(const QByteArray &content = QByteArray("500 Internal Error")){
+		Response response(500);
+		response.setContent(content);
+		response.setFinished(true);
+		return response.toByteArray(NoMoreMakeups);
+	}
+
 private:
 	QString ctrl = "HTTP";
 	Version version;
@@ -108,7 +196,7 @@ private:
 
 	bool valid = false;
 
-	QString getTransferEncodingString(TransferEncoding transferEncoding){
+	static const QString getTransferEncodingString(TransferEncoding transferEncoding){
 		switch(transferEncoding){
 			case Normal: return QString("identity");
 			case Chunked: return QString("chunked");
@@ -116,7 +204,7 @@ private:
 		}
 	}
 
-	QString getContentTypeString(ContentType contentType){
+	static const QString getContentTypeString(ContentType contentType){
 		switch(contentType){
 			case 0: return QString("*/*");
 			case 1: return QString("text/plain");
@@ -157,7 +245,7 @@ private:
 		}
 	}
 
-	QString getConnectionString(Connection connection){
+	static const QString getConnectionString(Connection connection){
 		switch(connection){
 			case Keep_Alive: return QString("keep-alive");
 			case Close: return QString("close");
@@ -165,7 +253,7 @@ private:
 		}
 	}
 
-	QString getCacheControlString(CacheControl cacheControl){
+	static const QString getCacheControlString(CacheControl cacheControl){
 		switch(cacheControl){
 			case 1: return QString("must-revalidate");
 			case 2: return QString("no-cache");
@@ -179,8 +267,35 @@ private:
 			default: return QString();
 		}
 	}
+
+	const QString headerString(const QByteArray &crlf = QByteArray("\x0D\x0A")){
+		QStringList headers;
+		if(this->header.isEmpty()){
+			return QString();
+		}
+		QStringList keys = this->header.keys();
+		foreach(const QString &key, keys){
+			headers.append(QString("%1: %2").arg(key).arg(header.value(key)));
+		}
+		return headers.join(crlf);
+	}
+
+	static QString regenerateKey(const QString &str){
+		QStringList keySep = str.split("-", QString::KeepEmptyParts);
+		QStringList newKeySep;
+		foreach(QString key, keySep){
+			if(key.isEmpty()){
+				continue;
+			}
+			QChar firstLetter = key.at(0).toUpper();
+			QString restLetters = key.mid(1).toLower();
+			newKeySep.append(QString(firstLetter).append(restLetters));
+		}
+		return newKeySep.join("-");
+	}
 public:
-	Response(){
+	Response(int statusCode = 200){
+		this->setStatusCode(statusCode);
 		this->setServer("Qt", QT_VERSION_STR);
 		this->setDate(QDateTime::currentDateTimeUtc());
 		this->setContentType(Text_Html, "utf-8");
@@ -189,13 +304,28 @@ public:
 		this->setCacheControl((Response::CacheControl)(No_Cache | No_Store));
 		this->setPragma();
 	}
+	inline void setFinished(bool valid){
+		this->valid = valid;
+	}
 
 	bool isValid(){
-		return (this->statusCode ? true : false) && this->valid;
+		return (this->statusCode ? true : false) && (!this->ctrl.isEmpty()) && (this->version.majorVersion + this->version.minorVersion) && this->valid;
 	}
 
 	inline void setCtrl(const QString &ctrl){ this->ctrl = ctrl; }
 	inline void setVersion(const Version &version){ this->version = version; }
+	const QString getCtrlAndVersionString() const{
+		return QString(this->ctrl.append("/%1.%2")).arg(this->version.majorVersion).arg(this->version.minorVersion);
+	}
+
+	inline void setStatusCode(int statusCode){
+		this->statusCode = statusCode;
+		this->statusReason = this->getStatusCodeReason(statusCode);
+	}
+
+	inline int getStatusCode(){
+		return this->statusCode;
+	}
 
 	void setTransferEncodingEnable(bool enable){
 		if(enable){
@@ -211,12 +341,12 @@ public:
 		if(charset.isEmpty()){
 			this->header.insert("Content-Type", this->getContentTypeString(contentType));
 		}else{
-			this->header.insert("Content-Type", this->getContentTypeString(contentType).append(";").append("charset=").append(charset));
+			this->header.insert("Content-Type", QString(this->getContentTypeString(contentType)).append(";").append("charset=").append(charset));
 		}
 	}
 
 	void setRawHeader(const QString &key, const QString &value){
-		this->header.insert(key, value);
+		this->header.insert(this->regenerateKey(key), value);
 	}
 
 	inline void setHeader(const QString &key, const QString &value){
@@ -309,12 +439,12 @@ public:
 		}
 		if(cacheControls | Max_Age){
 			if(secondsHash.contains(Max_Age)){
-				cacheControlsStr.append(this->getCacheControlString(Max_Age).append(QString::number(secondsHash.value(Max_Age))));
+				cacheControlsStr.append(QString(this->getCacheControlString(Max_Age)).append(QString::number(secondsHash.value(Max_Age))));
 			}
 		}
 		if(cacheControls | S_Maxage){
 			if(secondsHash.contains(S_Maxage)){
-				cacheControlsStr.append(this->getCacheControlString(S_Maxage).append(QString::number(secondsHash.value(S_Maxage))));
+				cacheControlsStr.append(QString(this->getCacheControlString(S_Maxage)).append(QString::number(secondsHash.value(S_Maxage))));
 			}
 		}
 
@@ -341,7 +471,56 @@ public:
 		return this->header;
 	}
 
+	void setContent(const QByteArray &content){
+		this->content = content;
+		if(this->header.value("Transfer-Encoding") != this->getTransferEncodingString(Chunked)){
+			this->header.insert("Content-Length", QString::number(this->content.length()));
+		}
+	}
 
+	void appendContent(const QByteArray &content){
+		this->content.append(content);
+		if(this->header.value("Transfer-Encoding") != this->getTransferEncodingString(Chunked)){
+			this->header.insert("Content-Length", QString::number(this->content.length()));
+		}
+	}
+
+	const QByteArray getContent(){
+		return this->content;
+	}
+
+	const QByteArray toByteArray(MakeupFlag flag = Strict){
+		QByteArray responseFrame = this->headerToByteArray(flag);
+		if(MakeupFlag != Strict){
+			return responseFrame;
+		}
+		if(!this->content.isEmpty()){
+			return responseFrame.toUtf8().append(this->content).append("\r\n");
+		}else{
+			return responseFrame.toUtf8();
+		}
+	}
+
+	const QByteArray headerToByteArray(MakeupFlag flag = Strict){
+		if(!this->isValid() && flag == Strict){
+			return makeup500Response();
+		}else if(!this->isValid() && flag == NoMoreMakeups){
+			qDebug() << "[HS:P]:" << __func__ << ":response is invalid and Offical 404 Response called recursively!";
+			return QByteArray();
+		}
+
+		if(!this->header.contains("Content-Length") && !this->content.isEmpty()){
+			this->header.insert("Content-Length", QString::number(this->content.length()));
+		}
+
+		QString responseFrame = QString("%1 %2 %3\r\n%4\r\n\r\n")
+				.arg(this->getCtrlAndVersionString())
+				.arg(this->statusCode)
+				.arg(this->statusReason.isEmpty() ? this->getStatusCodeReason(this->statusCode) : this->statusReason)
+				.arg(this->headerString());
+
+		return responseFrame.toUtf8();
+	}
 };
 
 #endif // RESPONSE_H
