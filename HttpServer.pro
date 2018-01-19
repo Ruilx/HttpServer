@@ -41,3 +41,7 @@ HEADERS += \
     HttpServer/Helper.h \
     HttpServer/Structure/Request.h \
     HttpServer/Structure/Response.h
+
+DISTFILES += \
+    README.md
+
