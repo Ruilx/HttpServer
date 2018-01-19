@@ -408,7 +408,7 @@ public:
 						request->appendContent(currentContent);
 						return true;
 					}else{
-						request->appendContent(currentContent.left(contentLength - request->content.length()));
+						request->appendContent(currentContent.left(contentLength - request->getContentLength()));
 						request->_halfLine.clear();
 						request->setFinished(true);
 						return true;
