@@ -174,7 +174,7 @@ private slots:
 			client.handle->msgSendBadRequest();
 			return;
 		}
-		if(request.valid == false){
+		if(request.isValid() == false){
 			// 协议解释成功, 但是现在还不能用, 因为数据没有传送完, 留下等待下一次数据进来继续解释.
 			this->clientReqMap.insert(tid, request);
 			return;
