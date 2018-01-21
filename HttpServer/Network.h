@@ -40,8 +40,15 @@ class Network : public QObject
 
 	void removeClientMap(qint64 tid){
 		this->clientMap.remove(tid);
+		this->checkClientMapState();
 		qDebug() << "客户端列表 减少一条:" << tid;
 		qDebug() << "现在客户端列表中有:" << this->clientMap.keys();
+	}
+
+	void checkClientMapState(){
+		if(this->clientMap.isEmpty()){
+			emit this->emptyClientMap();
+		}
 	}
 public:
 	explicit Network(const QHostAddress &hostAdress, int port, QObject *parent = nullptr) : QObject(parent){
@@ -61,10 +68,16 @@ public:
 	~Network(){
 		foreach(Client p, this->clientMap){
 			if(p.thread->isRunning()){
-				p.thread->quit();
-				p.thread->wait();
+//				p.thread->quit();
+//				p.thread->wait();
+				p.handle->close();
 			}
 		}
+		QEventLoop eventLoop;
+		connect(this, &Network::emptyClientMap, &eventLoop, &QEventLoop::quit);
+		this->checkClientMapState();
+		qDebug() << "Waiting for all thread quitted...";
+		eventLoop.exec();
 	}
 
 	inline bool isRunning(){
@@ -77,6 +90,7 @@ public:
 signals:
 	void serverStarted();
 	void serverStopped();
+	void emptyClientMap();
 public slots:
 	bool startServer(){
 		if(this->isRunning()){
@@ -98,10 +112,10 @@ public slots:
 			qDebug() << "服务器未在运行, 不需要执行关闭.";
 			return;
 		}
-		QList<qint64> tidList = this->clientMap.keys();
-		foreach(qint64 tid, tidList){
-			this->deleteConnection(tid);
-		}
+//		QList<qint64> tidList = this->clientMap.keys();
+//		foreach(qint64 tid, tidList){
+//			this->deleteConnection(tid);
+//		}
 		this->server->close();
 		qDebug() << "服务器已关闭.";
 		emit this->serverStopped();
@@ -181,31 +195,140 @@ private slots:
 		}else{
 			// Means transferred completely.
 			this->helper->restart(tid);
-			if(this->callBackFunc == nullptr){
-				qDebug() << "CallBack函数未设定.";
-				client.handle->msgSendInternalError();
-				return;
-			}
-			Response response = this->callBackFunc(request);
-			if(response.isValid() == false){
-				qDebug() << "CallBack函数返回response不可用.";
-				client.handle->msgSendInternalError();
-				return;
-			}
 
-			// 判断支持的HTTP类型
-			/* 支持的协议:
-			 * 方法: GET, POST, HEAD
-			 * 位置: 必须以'/'开头来寻找地址
-			 * 协议: HTTP/1.0以上
-			 * 支持的内容: text/html, text/plain, application/javascript...
-			 * 支持Transfer-Encoding: chunked
-			 */
+			do{
+				// Check request standard protocol
+				if(request.getCtrl() != "HTTP"){
+					// HTTP check failed
+					qDebug() << "Request Ctrl 'HTTP' not matched: " << request.getCtrl();
+					client.handle->msgSendBadRequest();
+					break;
+				}
+				if(request.getVersion().majorVersion + request.getVersion().minorVersion == 0){
+					// no version found
+					qDebug() << "Request HTTP version check failed.";
+					client.handle->msgSendBadRequest();
+					break;
+				}
+				if((request.getVersion().majorVersion == 1 && request.getVersion().minorVersion >= 1) ||
+						(request.getVersion().majorVersion > 1)){
+					// version upd HTTP/1.1 requires Host header.
+					if(request.getHeader("Host").isEmpty()){
+						qDebug() << "This request HTTP version requires Host header.";
+						client.handle->msgSendBadRequest();
+						break;
+					}
+				}
 
+				if(this->callBackFunc == nullptr){
+					qDebug() << "CallBack函数未设定.";
+					client.handle->msgSendInternalError();
+					break;
+				}
+				Response response = this->callBackFunc(request);
+				if(response.isValid() == false){
+					qDebug() << "CallBack函数返回response不可用.";
+					client.handle->msgSendInternalError();
+					break;
+				}
 
-			//client.handle->msgSend(Protocol::makeupResponse(response));
-			client.handle->msgSend(response.toByteArray());
-			client.handle->close();
+				// 判断支持的HTTP类型
+				/* 支持的协议:
+				 * 方法: GET, POST, HEAD
+				 * 位置: 必须以'/'开头来寻找地址
+				 * 协议: HTTP/1.0以上
+				 * 支持的内容: text/html, text/plain, application/javascript...
+				 * 支持Transfer-Encoding: chunked
+				 */
+
+				//if(response.getHeader("Transfer-Encoding") == Response::getTransferEncodingString(Response::Chunked)){
+				if(response.getTransferEncoding() == Response::Chunked){
+					// Chunked
+					QByteArray buffer(8192, 0);
+					// Using Chunked mode cannot set Content-Length header.
+					response.removeHeader("Content-Length");
+					if(response.getContentMode() == Response::Content_Text){
+						// Chunked Content:Text
+						// Send Header.
+						client.handle->msgSend(response.headerToByteArray());
+						QDataStream bufferStream(response.getContent());
+						while(!bufferStream.atEnd()){
+							int length = bufferStream.readRawData(buffer.data(), buffer.length());
+							client.handle->msgSend(QString::number(length, 16).append("\r\n").toUtf8());
+							client.handle->msgSend(buffer.left(length));
+							client.handle->msgSend(QByteArray("\r\n"));
+						}
+						client.handle->msgSend(QByteArray("0\r\n"), true);
+					}else if(response.getContentMode() == Response::Content_File){
+						// Chunked Content:File
+						if(response.getContent().isEmpty()){
+							qDebug() << "[网络]:" << __func__ << ":response指定的文件路径为空.";
+							client.handle->msgSend(Response::makeup500Response(), true);
+						}else{
+							QFile file(QString::fromUtf8(response.getContent()));
+							if(!file.open(QIODevice::ReadOnly)){
+								qDebug() << "[网络]:" << __func__ << ":无法打开response指定的文件:" << file.fileName();
+								client.handle->msgSend(Response::makeup404Response(), true);
+							}else{
+								client.handle->msgSend(response.headerToByteArray());
+								QDataStream bufferStream(&file);
+								while(!bufferStream.atEnd()){
+									int length = bufferStream.readRawData(buffer.data(), buffer.length());
+									client.handle->msgSend(QString::number(length, 16).append("\r\n").toUtf8());
+									client.handle->msgSend(buffer.left(length));
+									client.handle->msgSend(QByteArray("\r\n"));
+								}
+								file.close();
+								client.handle->msgSend(QByteArray("0\r\n"), true);
+							}
+						}
+
+					}else{
+						// Chunked Cannot_determined_what_content_is
+						qDebug() << "[网络]:" << __func__ << ":未知的ContentMode:" << response.getContentMode();
+						client.handle->msgSend(Response::makeup500Response(), true);
+					}
+				}else if(response.getTransferEncoding() == Response::Normal){
+					// Normal(identity)
+					// Using Normal mode cannot set Transfer_Encoding header.
+					response.removeHeader("Transfer_Encoding");
+					if(response.getContentMode() == Response::Content_Text){
+						// Normal Content:Text
+						if(response.getHeader("Content-Length").isEmpty() || response.getHeader("Content-Length") == "-1"){
+							response.insertHeader("Content-Length", QString::number(response.getContentLength()));
+						}
+						client.handle->msgSend(response.toByteArray(), true);
+					}else if(response.getContentMode() == Response::Content_File){
+						// Normal Content:File
+						if(response.getContent().isEmpty()){
+							qDebug() << "[网络]:" << __func__ << ":response指定的文件路径为空.";
+							client.handle->msgSend(Response::makeup500Response(), true);
+						}else{
+							QFile file(QString::fromUtf8(response.getContent()));
+							if(!file.open(QIODevice::ReadOnly)){
+								qDebug() << "[网络]:" << __func__ << ":无法打开response指定的文件:" << file.fileName();
+								client.handle->msgSend(Response::makeup404Response(), true);
+							}else{
+								client.handle->msgSend(response.headerToByteArray());
+								client.handle->msgSend(file.readAll(), true);
+								file.close();
+							}
+						}
+					}else{
+						// Normal Cannot_determined_what_content_is
+						qDebug() << "[网络]:" << __func__ << ":未知的ContentMode:" << response.getContentMode();
+						client.handle->msgSend(Response::makeup500Response(), true);
+					}
+				}
+
+				if(request.getHeader("Connection") == "keep-alive" && response.getHeader("Connection") == "keep-alive"){
+					client.handle->setResponseFinished();
+					this->helper->restart(tid);
+				}else{
+					client.handle->close();
+				}
+			}while(false);
+
 			this->clientReqMap.remove(tid);
 		}
 	}
