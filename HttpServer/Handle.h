@@ -112,6 +112,12 @@ public slots:
 		this->socket->waitForBytesWritten();
 		this->socket->close();
 	}
+	void setResponseFinished(bool finished = true){
+		// this flag set the response has finished but keep-alive flag set
+		// therefore, socket would not close immediately.
+		// so that this function can send the socket again.
+		this->alreadyReplied = !finished;
+	}
 protected:
 	void timerEvent(QTimerEvent *){
 		qint64 bytes = this->byteAvailable;
