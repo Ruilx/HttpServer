@@ -85,6 +85,10 @@ public:
 		}
 	}
 
+	const Version getVersion() const{
+		return this->version;
+	}
+
 	bool setUrl(const QString &url){
 		QUrl _url = QUrl::fromPercentEncoding(url.toUtf8());
 		if(!_url.isValid()){
