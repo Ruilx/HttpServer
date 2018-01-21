@@ -9,6 +9,11 @@
 class Response
 {
 public:
+	enum ContentMode{
+		Content_Text,
+		Content_File,
+	};
+
 	typedef struct{
 		short majorVersion = 1;
 		short minorVersion = 1;
@@ -38,6 +43,7 @@ public:
 		Image_Bmp = 104,
 		Image_Webp = 105,
 		Image_SvgPlusXml = 106,
+		Image_Ico = 107,
 		Audio_Any = 200,
 		Audio_Midi = 201,
 		Audio_Mpeg = 202,
@@ -48,7 +54,7 @@ public:
 		Video_Any = 300,
 		Video_Webm = 301,
 		Video_Ogg = 302,
-		Video_Mp4 = 303,
+		Video_Mpeg4 = 303,
 		Multipart_Any = 9000,
 		Multipart_From_Data = 9001,
 		Multipart_Byteranges = 9002,
@@ -185,6 +191,8 @@ public:
 	}
 
 private:
+	ContentMode contentMode;
+
 	QString ctrl = "HTTP";
 	Version version;
 	int statusCode = 0;
@@ -219,6 +227,7 @@ private:
 			case 104: return QString("image/bmp");
 			case 105: return QString("image/webp");
 			case 106: return QString("image/svg+xml");
+			case 107: return QString("image/x-icon");
 			case 200: return QString("audio/*");
 			case 201: return QString("audio/midi");
 			case 202: return QString("audio/mpeg");
@@ -226,10 +235,10 @@ private:
 			case 204: return QString("audio/ogg");
 			case 205: return QString("audio/wav");
 			case 206: return QString("audio/mp3");
-			case 300: return QString("video/any");
+			case 300: return QString("video/*");
 			case 301: return QString("video/webm");
 			case 302: return QString("video/ogg");
-			case 303: return QString("video/mp4");
+			case 303: return QString("video/mpeg4");
 			case 9000: return QString("multipart/*");
 			case 9001: return QString("multipart/from-data");
 			case 9002: return QString("multipart/byteranges");
@@ -337,6 +346,10 @@ public:
 		}
 	}
 
+	TransferEncoding getTransferEncoding() const{
+		return this->header.value("Transfer-Encoding") == this->getTransferEncodingString(Chunked) ? Chunked : Normal;
+	}
+
 	void setContentType(ContentType contentType, const QString &charset = QString()){
 		if(charset.isEmpty()){
 			this->header.insert("Content-Type", this->getContentTypeString(contentType));
@@ -351,6 +364,14 @@ public:
 
 	inline void setHeader(const QString &key, const QString &value){
 		this->setRawHeader(key, value);
+	}
+
+	inline void insertHeader(const QString &key, const QString &value){
+		this->setRawHeader(key, value);
+	}
+
+	void removeHeader(const QString &key){
+		this->header.remove(key);
 	}
 
 	void setCookie(const QNetworkCookie &cookie){
@@ -467,26 +488,57 @@ public:
 		}
 	}
 
-	QHash<QString, QString> getHeader(){
+	QHash<QString, QString> getHeader() const{
 		return this->header;
 	}
 
+	const QString getHeader(const QString &key, const QString &defaultValue = QString()) const{
+		return this->header.value(key, defaultValue);
+	}
+
+	int getHeaderLength() const{
+		return this->header.count();
+	}
+
+	QStringList getHeaderKeys() const{
+		return this->header.keys();
+	}
+
 	void setContent(const QByteArray &content){
+		this->contentMode = Content_Text;
 		this->content = content;
 		if(this->header.value("Transfer-Encoding") != this->getTransferEncodingString(Chunked)){
 			this->header.insert("Content-Length", QString::number(this->content.length()));
 		}
 	}
 
+	void setFile(const QString &filename){
+		this->contentMode = Content_File;
+		this->content = filename.toUtf8();
+		if(this->header.value("Transfer_Encoding") != this->getTransferEncodingString(Chunked)){
+			this->header.insert("Content-Length", QString::number(-1));
+			// -1 can make the network module recheck the content length from user's response.
+		}
+	}
+
 	void appendContent(const QByteArray &content){
+		this->contentMode = Content_Text;
 		this->content.append(content);
 		if(this->header.value("Transfer-Encoding") != this->getTransferEncodingString(Chunked)){
 			this->header.insert("Content-Length", QString::number(this->content.length()));
 		}
 	}
 
-	const QByteArray getContent(){
+	const QByteArray getContent() const{
 		return this->content;
+	}
+
+	int getContentLength() const{
+		return this->content.length();
+	}
+
+	ContentMode getContentMode() const{
+		return this->contentMode;
 	}
 
 	const QByteArray toByteArray(MakeupFlag flag = Strict){
@@ -509,7 +561,7 @@ public:
 			return QByteArray();
 		}
 
-		if(!this->header.contains("Content-Length") && !this->content.isEmpty()){
+		if(this->getTransferEncoding() != Chunked && !this->header.contains("Content-Length") && !this->content.isEmpty()){
 			this->header.insert("Content-Length", QString::number(this->content.length()));
 		}
 
