@@ -47,7 +47,7 @@ class MainW : public QMainWindow
 	}
 
 	Response makeA404Response(){
-		Response res = Protocol::getDefaultResponse(404);
+		Response res(404);
 		res.setContent("<html><head><title>404 Not Found</title></head><body><center><h1>您访问了一个不存在的页面 [404]</h1></center></body></html>");
 		res.setFinished(true);
 		return res;
@@ -97,7 +97,6 @@ public:
 
 		connect(this->getA200Response, &QAction::triggered, this, [this](bool){
 			Response res;
-
 			res.setContent("Yeah! Return 200 OK!");
 			res.setStatusCode(200);
 			res.setFinished(true);
@@ -140,7 +139,7 @@ public:
 		});
 
 		this->network->setCallbackFunc([this](const Request &request){
-			return this->callBackFunction(request);
+			return this->callBackFunction2(request);
 		});
 
 	}
@@ -207,6 +206,98 @@ public:
 //			res.valid = true;
 		return res;
 	}
+
+	Response::ContentType getContentType(const QString &suffix){
+		if(suffix == "htm" || suffix == "html" || suffix == "xhtml" || suffix == "htx"){
+			return Response::Text_Html;
+		}else if(suffix == "css"){
+			return Response::Text_Css;
+		}else if(suffix == "js"){
+			return Response::Text_Javascript;
+		}else if(suffix == "json"){
+			return Response::Application_Json;
+		}else if(suffix == "txt" || suffix == "text"){
+			return Response::Text_Plain;
+		}else if(suffix == "png"){
+			return Response::Image_Png;
+		}else if(suffix == "jpg" || suffix == "jpeg" || suffix == "jpe"){
+			return Response::Image_Jpeg;
+		}else if(suffix == "bmp"){
+			return Response::Image_Bmp;
+		}else if(suffix == "gif"){
+			return Response::Image_Gif;
+		}else if(suffix == "ico" || suffix == "icon"){
+			return Response::Image_Ico;
+		}else if(suffix == "mid" || suffix == "midi"){
+			return Response::Audio_Midi;
+		}else if(suffix == "mp3"){
+			return Response::Audio_Mp3;
+		}else if(suffix == "ogg"){
+			return Response::Audio_Ogg;
+		}else if(suffix == "wav"){
+			return Response::Audio_Wav;
+		}else if(suffix == "mp4"){
+			return Response::Video_Mpeg4;
+		}else if(suffix == "xml"){
+			return Response::Application_Xml;
+		}else if(suffix == "pdf"){
+			return Response::Application_Pdf;
+		}else if(suffix == "xhtml"){
+			return Response::Application_XhtmlPlusXml;
+		}else{
+			return Response::Application_Octet_Stream;
+		}
+	}
+
+
+	const Response callBackFunction2(const Request &request){
+		Response res(200);
+		QDir dir = QDir::current();
+		if(!dir.cd("webroot")){
+			qDebug() << "没有找到webroot, 返回404页面.";
+			return this->makeA404Response();
+		}
+		QFileInfo htmlFile(dir, request.getUrlLocalRelativePath());
+		if(htmlFile.isFile()){
+			qDebug() << "访问地址是一个文件.";
+			if(htmlFile.exists()){
+				res.setContent(this->readFile(htmlFile.absoluteFilePath()));
+				res.setTransferEncodingEnable(true);
+				res.setContentType(this->getContentType(htmlFile.suffix()), "utf-8");
+				res.setFinished(true);
+				return res;
+			}else{
+				qDebug() << "没有找到该文件, 返回404页面:" << htmlFile.absoluteFilePath();
+				return this->makeA404Response();
+			}
+		}else if(htmlFile.isDir()){
+			qDebug() << "访问地址是一个目录.";
+			//if(htmlFile.exists("index.html")){
+			dir = htmlFile.dir();
+			if(dir.exists("index.html")){
+				htmlFile.setFile(dir.filePath("index.html"));
+				res.setContent(this->readFile(htmlFile.absoluteFilePath()));
+				res.setTransferEncodingEnable(true);
+				res.setContentType(this->getContentType(htmlFile.suffix()), "utf-8");
+				res.setFinished(true);
+				return res;
+			}else if(dir.exists("index.htm")){
+				htmlFile.setFile(dir.filePath("index.htm"));
+				res.setContent(this->readFile(htmlFile.absoluteFilePath()));
+				res.setTransferEncodingEnable(true);
+				res.setContentType(this->getContentType(htmlFile.suffix()), "utf-8");
+				res.setFinished(true);
+				return res;
+			}else{
+				qDebug() << "没有找到该默认文件, 返回404页面:" << htmlFile.absoluteFilePath();
+				return this->makeA404Response();
+			}
+		}else{
+			qDebug() << "访问地址既不是文件也不是目录, 返回404页面:"  << htmlFile.path() << htmlFile.fileName();
+			return this->makeA404Response();
+		}
+	}
+
 	~MainW();
 };
 
