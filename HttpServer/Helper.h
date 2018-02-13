@@ -17,14 +17,14 @@ private:
 
 	inline void insertTimerTable(qint64 tid, const TimerCom &timerCom){
 		this->timerTable.insert(tid, timerCom);
-		qDebug() << "时间倒数表 插入一条:" << tid;
-		qDebug() << "现在时间倒数表中有:" << this->timerTable.keys();
+//		qDebug() << "时间倒数表 插入一条:" << tid;
+//		qDebug() << "现在时间倒数表中有:" << this->timerTable.keys();
 	}
 
 	inline void removeTimerTable(qint64 tid){
 		this->timerTable.remove(tid);
-		qDebug() << "时间倒数表 删除一条:" << tid;
-		qDebug() << "现在时间倒数表中有:" << this->timerTable.keys();
+//		qDebug() << "时间倒数表 删除一条:" << tid;
+//		qDebug() << "现在时间倒数表中有:" << this->timerTable.keys();
 	}
 public:
 	explicit Helper(QObject *parent = nullptr): QObject(parent){
