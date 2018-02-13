@@ -43,5 +43,9 @@ HEADERS += \
     HttpServer/Structure/Response.h
 
 DISTFILES += \
-    README.md
+	README.md \
+	webroot/index.htm \
+	webroot/favicon.ico \
+	webroot/demoA/index.htm \
+	webroot/demoB/demoB.html
 
