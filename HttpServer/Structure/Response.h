@@ -311,6 +311,7 @@ public:
 		this->setConnection(Close);
 		this->setXPoweredBy("RuilxHttpServer", "1.0");
 		this->setCacheControl((Response::CacheControl)(No_Cache | No_Store));
+		this->setRawHeader("Content-Encoding", "identity");
 		this->setPragma();
 	}
 	inline void setFinished(bool valid){
