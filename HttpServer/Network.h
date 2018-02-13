@@ -74,10 +74,11 @@ public:
 			}
 		}
 		QEventLoop eventLoop;
-		connect(this, &Network::emptyClientMap, &eventLoop, &QEventLoop::quit);
-		this->checkClientMapState();
-		qDebug() << "Waiting for all thread quitted...";
-		eventLoop.exec();
+		if(!this->clientMap.isEmpty()){
+			connect(this, &Network::emptyClientMap, &eventLoop, &QEventLoop::quit);
+			qDebug() << "Waiting for all thread quitted...";
+			eventLoop.exec();
+		}
 	}
 
 	inline bool isRunning(){
@@ -137,6 +138,7 @@ private slots:
 
 		connect(handleThread, &QThread::started, handle, &Handle::open);
 		connect(handleThread, &QThread::finished, handle, &Handle::close);
+		connect(handleThread, &QThread::finished, handle, &Handle::deleteLater);
 
 		handle->moveToThread(handleThread);
 		handleThread->start();
@@ -146,14 +148,14 @@ private slots:
 		//this->clientMap.insert(tid, client);
 		this->insertClientMap(tid, client);
 
-		qDebug() << "Network: 有客户接入, 开启倒数";
+//		qDebug() << "Network: 有客户接入, 开启倒数";
 		this->helper->insert(tid);
 		this->helper->start(tid);
-		qDebug() << "Network: 客户接入倒数设置成功.";
+//		qDebug() << "Network: 客户接入倒数设置成功.";
 	}
 
 	void deleteConnection(qint64 tid){
-		qDebug() << "客户端断开! 来源: handle::finished";
+//		qDebug() << "客户端断开! 来源: handle::finished";
 		Client client = this->clientMap.value(tid);
 		if(client.thread == nullptr){
 			qDebug() << "所传tid:" << tid << "没有在客户端列表中.";
@@ -161,17 +163,17 @@ private slots:
 			return;
 		}
 		client.handle->deleteLater();
-		qDebug() << "Client Thread:" << tid << "quitting and waiting...";
+//		qDebug() << "Client Thread:" << tid << "quitting and waiting...";
 		client.thread->quit();
 		client.thread->wait();
-		qDebug() << "Client Thread:" << tid << "quitted.";
+//		qDebug() << "Client Thread:" << tid << "quitted.";
 
 		//this->clientMap.remove(tid);
 		this->removeClientMap(tid);
-		qDebug() << "Network: 客户端断开, 关闭倒数";
-		this->helper->stop(tid);
-		this->helper->remove(tid);
-		qDebug() << "Network: 客户断开倒数取消成功.";
+//		qDebug() << "Network: 客户端断开, 关闭倒数";
+//		this->helper->stop(tid);
+		this->helper->remove(tid); // remove stopping automatically.
+//		qDebug() << "Network: 客户断开倒数取消成功.";
 	}
 
 	void receive(qint64 tid, const QByteArray &dat){
