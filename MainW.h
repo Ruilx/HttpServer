@@ -262,7 +262,7 @@ public:
 			qDebug() << "访问地址是一个文件.";
 			if(htmlFile.exists()){
 				res.setContent(this->readFile(htmlFile.absoluteFilePath()));
-				res.setTransferEncodingEnable(true);
+				//res.setTransferEncodingEnable(true);
 				res.setContentType(this->getContentType(htmlFile.suffix()), "utf-8");
 				res.setFinished(true);
 				return res;
@@ -277,14 +277,14 @@ public:
 			if(dir.exists("index.html")){
 				htmlFile.setFile(dir.filePath("index.html"));
 				res.setContent(this->readFile(htmlFile.absoluteFilePath()));
-				res.setTransferEncodingEnable(true);
+				//res.setTransferEncodingEnable(true);
 				res.setContentType(this->getContentType(htmlFile.suffix()), "utf-8");
 				res.setFinished(true);
 				return res;
 			}else if(dir.exists("index.htm")){
 				htmlFile.setFile(dir.filePath("index.htm"));
 				res.setContent(this->readFile(htmlFile.absoluteFilePath()));
-				res.setTransferEncodingEnable(true);
+				//res.setTransferEncodingEnable(true);
 				res.setContentType(this->getContentType(htmlFile.suffix()), "utf-8");
 				res.setFinished(true);
 				return res;
